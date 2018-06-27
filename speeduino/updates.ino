@@ -8,7 +8,7 @@
 
 void doUpdates()
 {
-  #define CURRENT_DATA_VERSION    8
+  #define CURRENT_DATA_VERSION    9
 
   //May 2017 firmware introduced a -40 offset on the ignition table. Update that table to +40
   if(EEPROM.read(EEPROM_DATA_VERSION) == 2)
@@ -99,10 +99,10 @@ void doUpdates()
     configPage10.flexBoostAdj[0]  = (int8_t)configPage2.unused2_1;
 
     configPage10.flexFuelBins[0] = 0;
-    configPage10.flexFuelAdj[0]  = configPage2.unused2_57;
+    configPage10.flexFuelAdj[0]  = configPage2.idleUpPin;
 
     configPage10.flexAdvBins[0] = 0;
-    configPage10.flexAdvAdj[0]  = configPage2.unused2_59;
+    configPage10.flexAdvAdj[0]  = configPage2.taeTaperMin;
 
     for (uint8_t x = 1; x < 6; x++)
     {
@@ -114,15 +114,28 @@ void doUpdates()
       int16_t boostAdder = (((configPage2.unused2_2 - (int8_t)configPage2.unused2_1) * pct) / 100) + (int8_t)configPage2.unused2_1;
       configPage10.flexBoostAdj[x] = boostAdder;
 
-      uint8_t fuelAdder = (((configPage2.unused2_58 - configPage2.unused2_57) * pct) / 100) + configPage2.unused2_57;
+      uint8_t fuelAdder = (((configPage2.idleUpAdder - configPage2.idleUpPin) * pct) / 100) + configPage2.idleUpPin;
       configPage10.flexFuelAdj[x] = fuelAdder;
 
-      uint8_t advanceAdder = (((configPage2.unused2_60 - configPage2.unused2_59) * pct) / 100) + configPage2.unused2_59;
+      uint8_t advanceAdder = (((configPage2.taeTaperMax - configPage2.taeTaperMin) * pct) / 100) + configPage2.taeTaperMin;
       configPage10.flexAdvAdj[x] = advanceAdder;
     }
 
     writeAllConfig();
     EEPROM.write(EEPROM_DATA_VERSION, 8);
+  }
+
+  if (EEPROM.read(EEPROM_DATA_VERSION) == 8)
+  {
+    //May 2018 adds separate load sources for fuel and ignition. Copy the existing load alogirthm into Both
+    configPage2.fuelAlgorithm = configPage2.unused2_38c;
+    configPage2.ignAlgorithm = configPage2.unused2_38c;
+
+    //Add option back in for open or closed loop boost. For all current configs to use closed
+    configPage4.boostType = 1;
+
+    writeAllConfig();
+    EEPROM.write(EEPROM_DATA_VERSION, 9);
   }
 
   //Final check is always for 255 and 0 (Brand new arduino)

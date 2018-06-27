@@ -15,6 +15,7 @@ Flood clear mode etc.
 
 #include "corrections.h"
 #include "globals.h"
+#include "timers.h"
 
 long PID_O2, PID_output, PID_AFRTarget;
 PID egoPID(&PID_O2, &PID_output, &PID_AFRTarget, configPage6.egoKP, configPage6.egoKI, configPage6.egoKD, REVERSE); //This is the PID object if that algorithm is used. Needs to be global as it maintains state outside of each function call
@@ -193,7 +194,23 @@ static inline int16_t correctionAccel()
       {
         BIT_SET(currentStatus.engine, BIT_ENGINE_ACC); //Mark accleration enrichment as active.
         currentStatus.TAEEndTime = micros_safe() + ((unsigned long)configPage2.taeTime * 10000); //Set the time in the future where the enrichment will be turned off. taeTime is stored as mS / 10, so multiply it by 100 to get it in uS
-        accelValue = 100 + table2D_getValue(&taeTable, currentStatus.tpsDOT);
+        accelValue = table2D_getValue(&taeTable, currentStatus.tpsDOT);
+
+        //Apply the taper to the above
+        //The RPM settings are stored divided by 100:
+        uint16_t trueTaperMin = configPage2.taeTaperMin * 100;
+        uint16_t trueTaperMax = configPage2.taeTaperMax * 100;
+        if (currentStatus.RPM > trueTaperMin)
+        {
+          if(currentStatus.RPM > trueTaperMax) { accelValue = 0; } //RPM is beyond taper max limit, so accel enrich is turned off
+          else 
+          {
+            int16_t taperRange = trueTaperMax - trueTaperMin;
+            int16_t taperPercent = ((currentStatus.RPM - trueTaperMin) * 100) / taperRange; //The percentage of the way through the RPM taper range
+            accelValue = percentage(taperPercent, accelValue); //Calculate the above percentage of the calculated accel amount. 
+          }
+        }
+        accelValue = 100 + accelValue; //Add the 100 normalisation to the calculated amount
       }
     }
   }
@@ -310,10 +327,7 @@ static inline byte correctionAFRClosedLoop()
     currentStatus.afrTarget = currentStatus.O2; //Catch all incase the below doesn't run. This prevents the Include AFR option from doing crazy things if the AFR target conditions aren't met. This value is changed again below if all conditions are met.
 
     //Determine whether the Y axis of the AFR target table tshould be MAP (Speed-Density) or TPS (Alpha-N)
-    byte yValue;
-    if (configPage2.algorithm == 0) { yValue = currentStatus.MAP; }
-    else  { yValue = currentStatus.TPS; }
-    currentStatus.afrTarget = get3DTableValue(&afrTable, yValue, currentStatus.RPM); //Perform the target lookup
+    currentStatus.afrTarget = get3DTableValue(&afrTable, currentStatus.fuelLoad, currentStatus.RPM); //Perform the target lookup
 
     //Check all other requirements for closed loop adjustments
     if( (currentStatus.coolant > (int)(configPage6.egoTemp - CALIBRATION_TEMPERATURE_OFFSET)) && (currentStatus.RPM > (unsigned int)(configPage6.egoRPM * 100)) && (currentStatus.TPS < configPage6.egoTPSMax) && (currentStatus.O2 < configPage6.ego_max) && (currentStatus.O2 > configPage6.ego_min) && (currentStatus.runSecs > configPage6.ego_sdelay) )
@@ -334,19 +348,21 @@ static inline byte correctionAFRClosedLoop()
             //Running lean
             if(currentStatus.egoCorrection < (100 + configPage6.egoLimit) ) //Fueling adjustment must be at most the egoLimit amount (up or down)
             {
-              if(currentStatus.egoCorrection >= 100) { AFRValue = (currentStatus.egoCorrection + 1); } //Increase the fueling by 1%
-              else { AFRValue += 1; } //This means that the last reading had been rich, so start counting back towards 100%
+              AFRValue = (currentStatus.egoCorrection + 1); //Increase the fueling by 1%
             }
-            else { AFRValue = currentStatus.egoCorrection; } //Means we're at the maximum adjustment amount, so simply return then again
+            else { AFRValue = currentStatus.egoCorrection; } //Means we're at the maximum adjustment amount, so simply return that again
           }
-          else
+          else if(currentStatus.O2 < currentStatus.afrTarget)
+          {
             //Running Rich
             if(currentStatus.egoCorrection > (100 - configPage6.egoLimit) ) //Fueling adjustment must be at most the egoLimit amount (up or down)
             {
-              if(currentStatus.egoCorrection <= 100) { AFRValue = (currentStatus.egoCorrection - 1); } //Increase the fueling by 1%
-              else { AFRValue -= 1; } //This means that the last reading had been lean, so start count back towards 100%
+              AFRValue = (currentStatus.egoCorrection - 1); //Decrease the fueling by 1%
             }
-            else { AFRValue = currentStatus.egoCorrection; } //Means we're at the maximum adjustment amount, so simply return then again
+            else { AFRValue = currentStatus.egoCorrection; } //Means we're at the maximum adjustment amount, so simply return that again
+          }
+          else { AFRValue = currentStatus.egoCorrection; } //Means we're already right on target
+
         }
         else if(configPage6.egoAlgorithm == EGO_ALGORITHM_PID)
         {
@@ -389,7 +405,7 @@ int8_t correctionsIgn(int8_t base_advance)
 
 static inline int8_t correctionFixedTiming(int8_t advance)
 {
-  byte ignFixValue = advance;
+  int8_t ignFixValue = advance;
   if (configPage4.FixAng != 0) { ignFixValue = configPage4.FixAng; } //Check whether the user has set a fixed timing angle
   return ignFixValue;
 }

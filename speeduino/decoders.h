@@ -12,7 +12,7 @@
 #endif
 
 static inline void addToothLogEntry(unsigned long);
-static inline uint16_t stdGetRPM();
+static inline uint16_t stdGetRPM(uint16_t degreesOver);
 static inline void setFilter(unsigned long);
 static inline int crankingGetRPM(byte);
 static inline void doPerToothTiming(uint16_t crankAngle);
@@ -80,5 +80,8 @@ int16_t toothAngles[24]; //An array for storing fixed tooth angles. Currently si
 //Used for identifying long and short pulses on the 4G63 (And possibly other) trigger patterns
 #define LONG 0;
 #define SHORT 1;
+
+#define CRANK_SPEED 0
+#define CAM_SPEED   1
 
 #endif

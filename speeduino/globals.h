@@ -67,6 +67,7 @@
 //Define the load algorithm
 #define LOAD_SOURCE_MAP         0
 #define LOAD_SOURCE_TPS         1
+#define LOAD_SOURCE_IMAPEMAP    2
 
 //Define bit positions within engine virable
 #define BIT_ENGINE_RUN      0   // Engine running
@@ -114,12 +115,13 @@
 #define BIT_TIMER_30HZ            4
 
 #define BIT_STATUS3_RESET_PREVENT 0 //Indicates whether reset prevention is enabled
-#define BIT_STATUS3_UNUSED2       1
-#define BIT_STATUS3_UNUSED3       2
-#define BIT_STATUS3_UNUSED4       3
-#define BIT_STATUS3_UNUSED5       4
-#define BIT_STATUS3_UNUSED6       5
-#define BIT_STATUS3_UNUSED7       6
+#define BIT_STATUS3_UNUSED1       1
+#define BIT_STATUS3_UNUSED2       2
+#define BIT_STATUS3_UNUSED3       3
+#define BIT_STATUS3_UNUSED4       4
+#define BIT_STATUS3_NSQUIRTS1     5
+#define BIT_STATUS3_NSQUIRTS2     6
+#define BIT_STATUS3_NSQUIRTS3     7
 
 #define VALID_MAP_MAX 1022 //The largest ADC value that is valid for the MAP sensor
 #define VALID_MAP_MIN 2 //The smallest ADC value that is valid for the MAP sensor
@@ -151,22 +153,25 @@
 #define HARD_CUT_FULL       0
 #define HARD_CUT_ROLLING    1
 
-#define SIZE_BYTE   8
-#define SIZE_INT    16
+#define SIZE_BYTE           8
+#define SIZE_INT            16
 
-#define EVEN_FIRE         0
-#define ODD_FIRE          1
+#define EVEN_FIRE           0
+#define ODD_FIRE            1
 
 #define EGO_ALGORITHM_SIMPLE  0
 #define EGO_ALGORITHM_PID     2
 
 #define STAGING_MODE_TABLE  0
-#define STAGING_MODE_AUTO  1
+#define STAGING_MODE_AUTO   1
 
 #define RESET_CONTROL_DISABLED             0
 #define RESET_CONTROL_PREVENT_WHEN_RUNNING 1
 #define RESET_CONTROL_PREVENT_ALWAYS       2
 #define RESET_CONTROL_SERIAL_COMMAND       3
+
+#define OPEN_LOOP_BOOST     0
+#define CLOSED_LOOP_BOOST   1
 
 #define MAX_RPM 18000 //This is the maximum rpm that the ECU will attempt to run at. It is NOT related to the rev limiter, but is instead dictates how fast certain operations will be allowed to run. Lower number gives better performance
 #define engineSquirtsPerCycle 2 //Would be 1 for a 2 stroke
@@ -271,6 +276,7 @@ int ignition1EndAngle = 0;
 int ignition2EndAngle = 0;
 int ignition3EndAngle = 0;
 int ignition4EndAngle = 0;
+int ignition5EndAngle = 0;
 
 //This is used across multiple files
 unsigned long revolutionTime; //The time in uS that one revolution would take at current speed (The time tooth 1 was last seen, minus the time it was seen prior to that)
@@ -292,6 +298,8 @@ struct statuses {
   int mapADC;
   int baroADC;
   long MAP; //Has to be a long for PID calcs (Boost control)
+  int16_t EMAP;
+  int16_t EMAPADC;
   byte baro; //Barometric pressure is simply the inital MAP reading, taken before the engine is running. Alternatively, can be taken from an external sensor
   byte TPS; //The current TPS reading (0% - 100%)
   byte TPSlast; //The previous TPS reading
@@ -325,6 +333,7 @@ struct statuses {
   byte flexIgnCorrection; //Amount of additional advance being applied based on flex
   byte afrTarget;
   byte idleDuty;
+  bool idleUpActive;
   bool fanOn; //Whether or not the fan is turned on
   volatile byte ethanolPct; //Ethanol reading (if enabled). 0 = No ethanol, 100 = pure ethanol. Eg E85 = 85.
   unsigned long TAEEndTime; //The target end time used whenever TAE is turned on
@@ -359,6 +368,10 @@ struct statuses {
   uint16_t crankRPM = 400; //The actual cranking RPM limit. Saves us multiplying it everytime from the config page
   volatile byte status3;
   int16_t flexBoostCorrection; //Amount of boost added based on flex
+  byte nSquirts;
+  byte nChannels; //Number of fuel and ignition channels
+  int16_t fuelLoad;
+  int16_t ignLoad;
 
   //Helpful bitwise operations:
   //Useful reference: http://playground.arduino.cc/Code/BitMath
@@ -405,7 +418,7 @@ struct config2 {
   byte multiplyMAP : 1;
   byte includeAFR : 1;
   byte hardCutType : 1;
-  byte unused26 : 3;
+  byte ignAlgorithm : 3;
   byte indInjAng : 1;
   byte injOpen; //Injector opening time (ms * 10)
   uint16_t inj1Ang;
@@ -420,15 +433,15 @@ struct config2 {
   byte nCylinders : 4; //Number of cylinders
 
   //config2 in ini
-  byte cltType1 : 2;
-  byte matType1 : 2;
+  byte fuelAlgorithm : 3;
+  byte unused2_37d : 1;
   byte nInjectors : 4; //Number of injectors
 
 
   //config3 in ini
   byte engineType : 1;
   byte flexEnabled : 1;
-  byte algorithm : 1; //"Speed Density", "Alpha-N"
+  byte unused2_38c : 1; //"Speed Density", "Alpha-N"
   byte baroCorr : 1;
   byte injLayout : 2;
   byte perToothIgn : 1;
@@ -449,10 +462,14 @@ struct config2 {
   uint16_t oddfire2; //The ATDC angle of channel 2 for oddfire
   uint16_t oddfire3; //The ATDC angle of channel 3 for oddfire
   uint16_t oddfire4; //The ATDC angle of channel 4 for oddfire
-  byte unused2_57;
-  byte unused2_58;
-  byte unused2_59;
-  byte unused2_60;
+
+  byte idleUpPin : 6;
+  byte idleUpPolarity : 1;
+  byte idleUpEnabled : 1;
+
+  byte idleUpAdder;
+  byte taeTaperMin;
+  byte taeTaperMax;
 
   byte iacCLminDuty;
   byte iacCLmaxDuty;
@@ -461,7 +478,9 @@ struct config2 {
   int8_t baroMin; //Must be signed
   uint16_t baroMax;
 
-  byte unused1_64[61];
+  int8_t EMAPMin; //Must be signed
+  uint16_t EMAPMax;
+  byte unused1_70[58];
 
 #if defined(CORE_AVR)
   };
@@ -474,7 +493,7 @@ struct config2 {
 struct config4 {
 
   int16_t triggerAngle;
-  byte FixAng;
+  int8_t FixAng; //Negative values allowed
   byte CrankAng;
   byte TrigAngMul; //Multiplier for non evenly divisible tooth counts.
 
@@ -496,7 +515,7 @@ struct config4 {
 
   byte StgCycles; //The number of initial cycles before the ignition should fire when first cranking
 
-  byte dwellCont : 1; //Fixed duty dwell control
+  byte boostType : 1; //Open or closed loop boost control
   byte useDwellLim : 1; //Whether the dwell limiter is off or on
   byte sparkMode : 3; //Spark output mode (Eg Wasted spark, single channel or Wasted COP)
   byte triggerFilter : 2; //The mode of trigger filter being used (0=Off, 1=Light (Not currently used), 2=Normal, 3=Aggressive)
@@ -562,7 +581,7 @@ struct config6 {
   byte boostMode : 1; //Simple of full boost contrl
   byte boostPin : 6;
   byte VVTasOnOff : 1; //Whether or not to use the VVT table as an on/off map
-  byte unused6_14 : 1;
+  byte useEMAP : 1;
   byte voltageCorrectionBins[6]; //X axis bins for voltage correction tables
   byte injVoltageCorrectionValues[6]; //Correction table for injector PW vs battery voltage
   byte airDenBins[9];
@@ -692,7 +711,7 @@ struct config10 {
   byte rotaryType : 2;
   byte stagingEnabled : 1;
   byte stagingMode : 1;
-  byte unused11_8e : 4;
+  byte EMAPPin : 4;
 
   byte rotarySplitValues[8];
   byte rotarySplitBins[8];
@@ -740,6 +759,7 @@ byte pinTrigger2; //The Cam Sensor pin
 byte pinTrigger3;	//the 2nd cam sensor pin
 byte pinTPS;//TPS input pin
 byte pinMAP; //MAP sensor pin
+byte pinEMAP; //EMAP sensor pin
 byte pinMAP2; //2nd MAP sensor (Currently unused)
 byte pinIAT; //IAT sensor pin
 byte pinCLT; //CLS sensor pin
@@ -751,6 +771,7 @@ byte pinTachOut; //Tacho output
 byte pinFuelPump; //Fuel pump on/off
 byte pinIdle1; //Single wire idle control
 byte pinIdle2; //2 wire idle control (Not currently used)
+byte pinIdleUp; //Input for triggering Idle Up
 byte pinSpareTemp1; // Future use only
 byte pinSpareTemp2; // Future use only
 byte pinSpareOut1; //Generic output

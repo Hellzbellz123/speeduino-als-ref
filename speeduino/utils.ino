@@ -40,6 +40,9 @@ uint16_t freeRam ()
 #endif
 }
 
+//This function performs a translation between the pin list that appears in TS and the actual pin numbers
+//For the digital IO, this will simply return the same number as the rawPin value as those are mapped directly.
+//For analog pins, it will translate them into the currect internal pin number
 byte pinTranslate(byte rawPin)
 {
   byte outputPin = rawPin;
@@ -47,6 +50,7 @@ byte pinTranslate(byte rawPin)
 
   return outputPin;
 }
+
 
 void setResetControlPinState()
 {
@@ -260,7 +264,7 @@ void setPinMapping(byte boardID)
         pinCLT = A3; //CLT sensor pin
         pinO2 = A4; //O2 Sensor pin
         pinBat = A5; //Battery reference voltage pin
-        pinBaro = A10;        
+        pinBaro = A10;
         pinIdle1 = PB8; //Single wire idle control
         pinIdle2 = PB9; //2 wire idle control
         pinBoost = PE0; //Boost control
@@ -519,6 +523,144 @@ void setPinMapping(byte boardID)
       pinResetControl = 26; //Reset control output
       break;
 
+    case 41:
+    #ifndef SMALL_FLASH_MODE //No support for bluepill here anyway
+      //Pin mappings as per the UA4C shield
+      pinInjector1 = 8; //Output pin injector 1 is on
+      pinInjector2 = 7; //Output pin injector 2 is on
+      pinInjector3 = 6; //Output pin injector 3 is on
+      pinInjector4 = 5; //Output pin injector 4 is on
+      pinInjector5 = 45; //Output pin injector 5 is on PLACEHOLDER value for now
+      pinCoil1 = 35; //Pin for coil 1
+      pinCoil2 = 36; //Pin for coil 2
+      pinCoil3 = 33; //Pin for coil 3
+      pinCoil4 = 34; //Pin for coil 4
+      pinCoil5 = 44; //Pin for coil 5 PLACEHOLDER value for now
+      pinTrigger = 19; //The CAS pin
+      pinTrigger2 = 18; //The Cam Sensor pin
+      pinFlex = 20; // Flex sensor
+      pinTPS = A3; //TPS input pin
+      pinMAP = A0; //MAP sensor pin
+      pinBaro = A7; //Baro sensor pin
+      pinIAT = A5; //IAT sensor pin
+      pinCLT = A4; //CLS sensor pin
+      pinO2 = A1; //O2 Sensor pin
+      pinO2_2 = A9; //O2 sensor pin (second sensor)
+      pinBat = A2; //Battery reference voltage pin
+      pinSpareTemp1 = A8; //spare Analog input 1
+      pinLaunch = 37; //Can be overwritten below
+      pinDisplayReset = 48; // OLED reset pin PLACEHOLDER value for now
+      pinTachOut = 22; //Tacho output pin
+      pinIdle1 = 9; //Single wire idle control
+      pinIdle2 = 10; //2 wire idle control
+      pinFuelPump = 23; //Fuel pump output
+      pinVVT_1 = 11; //Default VVT output
+      pinStepperDir = 32; //Direction pin  for DRV8825 driver
+      pinStepperStep = 31; //Step pin for DRV8825 driver
+      pinStepperEnable = 30; //Enable pin for DRV8825 driver
+      pinBoost = 12; //Boost control
+      pinSpareLOut1 = 26; //low current output spare1
+      pinSpareLOut2 = 27; //low current output spare2
+      pinSpareLOut3 = 28; //low current output spare3
+      pinSpareLOut4 = 29; //low current output spare4
+      pinFan = 24; //Pin for the fan output
+      //pinFan2 = 25; //Pin for the 2nd fan output
+      pinResetControl = 46; //Reset control output PLACEHOLDER value for now
+    #endif
+      break;
+
+    #if defined(CORE_TEENSY)
+    case 50:
+      //Pin mappings as per the teensy rev A shield
+      pinInjector1 = 2; //Output pin injector 1 is on
+      pinInjector2 = 10; //Output pin injector 2 is on
+      pinInjector3 = 6; //Output pin injector 3 is on - NOT USED
+      pinInjector4 = 9; //Output pin injector 4 is on - NOT USED
+      //pinInjector5 = 13; //Placeholder only - NOT USED
+      pinCoil1 = 29; //Pin for coil 1
+      pinCoil2 = 30; //Pin for coil 2
+      pinCoil3 = 31; //Pin for coil 3 - ONLY WITH DB2
+      pinCoil4 = 32; //Pin for coil 4 - ONLY WITH DB2
+      //pinCoil5 = 46; //Placeholder only - NOT USED
+      pinTrigger = 23; //The CAS pin
+      pinTrigger2 = 36; //The Cam Sensor pin
+      pinTPS = 16; //TPS input pin
+      pinMAP = 17; //MAP sensor pin
+      pinIAT = 14; //IAT sensor pin
+      pinCLT = 15; //CLT sensor pin
+      pinO2 = A22; //O2 sensor pin
+      pinO2_2 = A21; //O2 sensor pin (second sensor)
+      pinBat = 18; //Battery reference voltage pin
+      //pinBaro = A6; //Baro sensor pin - ONLY WITH DB
+      //pinSpareTemp1 = A7; //spare Analog input 1 - ONLY WITH DB
+      //pinDisplayReset = 48; // OLED reset pin - NOT USED
+      pinTachOut = 20; //Tacho output pin
+      pinIdle1 = 5; //Single wire idle control
+      //pinIdle2 = 47; //2 wire idle control - NOT USED
+      pinBoost = 11; //Boost control
+      //pinVVT_1 = 6; //Default VVT output
+      pinFuelPump = 38; //Fuel pump output
+      pinStepperDir = 34; //Direction pin for DRV8825 driver
+      pinStepperStep = 35; //Step pin for DRV8825 driver
+      pinStepperEnable = 33; //Enable pin for DRV8825 driver
+      pinLaunch = 26; //Can be overwritten below
+      //pinFlex = 20; // Flex sensor (Must be external interrupt enabled) - ONLY WITH DB
+      pinFan = 37; //Pin for the fan output - ONLY WITH DB
+      //pinSpareLOut1 = 32; //low current output spare1 - ONLY WITH DB
+      //pinSpareLOut2 = 34; //low current output spare2 - ONLY WITH DB
+      //pinSpareLOut3 = 36; //low current output spare3 - ONLY WITH DB
+      //pinResetControl = 26; //Reset control output
+      pinSpareHOut1 = 8; // high current output spare1
+      pinSpareHOut2 = 7; // high current output spare2
+      pinSpareLOut1 = 21; //low current output spare1
+      break;
+
+    case 51:
+      //Pin mappings as per the teensy revB board shield
+      pinInjector1 = 2; //Output pin injector 1 is on
+      pinInjector2 = 10; //Output pin injector 2 is on
+      pinInjector3 = 6; //Output pin injector 3 is on - NOT USED
+      pinInjector4 = 9; //Output pin injector 4 is on - NOT USED
+      //pinInjector5 = 13; //Placeholder only - NOT USED
+      pinCoil1 = 29; //Pin for coil 1
+      pinCoil2 = 30; //Pin for coil 2
+      pinCoil3 = 31; //Pin for coil 3 - ONLY WITH DB2
+      pinCoil4 = 32; //Pin for coil 4 - ONLY WITH DB2
+      //pinCoil5 = 46; //Placeholder only - NOT USED
+      pinTrigger = 23; //The CAS pin
+      pinTrigger2 = 36; //The Cam Sensor pin
+      pinTPS = 16; //TPS input pin
+      pinMAP = 17; //MAP sensor pin
+      pinIAT = 14; //IAT sensor pin
+      pinCLT = 15; //CLT sensor pin
+      pinO2 = A22; //O2 sensor pin
+      pinO2_2 = A21; //O2 sensor pin (second sensor)
+      pinBat = 18; //Battery reference voltage pin
+      //pinBaro = A6; //Baro sensor pin - ONLY WITH DB
+      //pinSpareTemp1 = A7; //spare Analog input 1 - ONLY WITH DB
+      //pinDisplayReset = 48; // OLED reset pin - NOT USED
+      pinTachOut = 20; //Tacho output pin
+      pinIdle1 = 5; //Single wire idle control
+      //pinIdle2 = 47; //2 wire idle control - NOT USED
+      pinBoost = 11; //Boost control
+      //pinVVT_1 = 6; //Default VVT output
+      pinFuelPump = 38; //Fuel pump output
+      pinStepperDir = 34; //Direction pin for DRV8825 driver
+      pinStepperStep = 35; //Step pin for DRV8825 driver
+      pinStepperEnable = 33; //Enable pin for DRV8825 driver
+      pinLaunch = 26; //Can be overwritten below
+      //pinFlex = 20; // Flex sensor (Must be external interrupt enabled) - ONLY WITH DB
+      pinFan = 37; //Pin for the fan output - ONLY WITH DB
+      //pinSpareLOut1 = 32; //low current output spare1 - ONLY WITH DB
+      //pinSpareLOut2 = 34; //low current output spare2 - ONLY WITH DB
+      //pinSpareLOut3 = 36; //low current output spare3 - ONLY WITH DB
+      //pinResetControl = 26; //Reset control output
+      pinSpareHOut1 = 8; // high current output spare1
+      pinSpareHOut2 = 7; // high current output spare2
+      pinSpareLOut1 = 21; //low current output spare1
+      break;
+    #endif
+
     default:
     #ifndef SMALL_FLASH_MODE //No support for bluepill here anyway
       //Pin mappings as per the v0.2 shield
@@ -564,6 +706,10 @@ void setPinMapping(byte boardID)
   if ( (configPage6.boostPin != 0) && (configPage6.boostPin < BOARD_NR_GPIO_PINS) ) { pinBoost = pinTranslate(configPage6.boostPin); }
   if ( (configPage6.vvtPin != 0) && (configPage6.vvtPin < BOARD_NR_GPIO_PINS) ) { pinVVT_1 = pinTranslate(configPage6.vvtPin); }
   if ( (configPage6.useExtBaro != 0) && (configPage6.baroPin < BOARD_NR_GPIO_PINS) ) { pinBaro = configPage6.baroPin + A0; }
+  if ( (configPage6.useEMAP != 0) && (configPage10.EMAPPin < BOARD_NR_GPIO_PINS) ) { pinEMAP = configPage10.EMAPPin + A0; }
+
+  //Currently there's no default pin for Idle Up
+  pinIdleUp = pinTranslate(configPage2.idleUpPin);
 
   /* Reset control is a special case. If reset control is enabled, it needs its initial state set BEFORE its pinMode.
      If that doesn't happen and reset control is in "Serial Command" mode, the Arduino will end up in a reset loop
@@ -664,12 +810,10 @@ void setPinMapping(byte boardID)
   pinMode(pinTrigger2, INPUT);
   pinMode(pinTrigger3, INPUT);
   pinMode(pinFlex, INPUT_PULLUP); //Standard GM / Continental flex sensor requires pullup
-  if (configPage6.lnchPullRes == true) {
-    pinMode(pinLaunch, INPUT_PULLUP);
-  }
-  else {
-    pinMode(pinLaunch, INPUT);  //If Launch Pull Resistor is not set make input float.
-  }
+  if (configPage6.lnchPullRes == true) { pinMode(pinLaunch, INPUT_PULLUP); }
+  else { pinMode(pinLaunch, INPUT); } //If Launch Pull Resistor is not set make input float.
+  if (configPage2.idleUpPolarity == 0) { pinMode(pinIdleUp, INPUT_PULLUP); } //Normal setting
+  else { pinMode(pinIdleUp, INPUT); } //inverted setting
 
   //These must come after the above pinMode statements
   triggerPri_pin_port = portInputRegister(digitalPinToPort(pinTrigger));
@@ -803,17 +947,8 @@ void initialiseTriggers()
       getCrankAngle = getCrankAngle_4G63;
       triggerSetEndTeeth = triggerSetEndTeeth_4G63;
 
-      //These may both need to change, not sure
-      if(configPage4.TrigEdge == 0)
-      {
-        attachInterrupt(triggerInterrupt, trigger, CHANGE);  // Attach the crank trigger wheel interrupt (Hall sensor drags to ground when triggering)
-        attachInterrupt(triggerInterrupt2, triggerSec_4G63, FALLING); //changed
-      }
-      else
-      {
-        attachInterrupt(triggerInterrupt, trigger, CHANGE); // Primary trigger connects to
-        attachInterrupt(triggerInterrupt2, triggerSec_4G63, FALLING);
-      }
+      attachInterrupt(triggerInterrupt, trigger, CHANGE); // Primary trigger connects to
+      attachInterrupt(triggerInterrupt2, triggerSec_4G63, FALLING);
       break;
 
     case 5:

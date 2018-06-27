@@ -103,11 +103,24 @@ static inline void readMAP()
           {
             currentStatus.mapADC = ADC_FILTER(tempReading, ADCFILTER_MAP, currentStatus.mapADC);
             MAPrunningValue += currentStatus.mapADC; //Add the current reading onto the total
-            //Old method (No filter)
-            //MAPrunningValue = MAPrunningValue + (unsigned long)tempReading;
             MAPcount++;
           }
           else { mapErrorCount += 1; }
+
+          //Repeat for EMAP if it's enabled
+          if(configPage6.useEMAP == true)
+          {
+            tempReading = analogRead(pinEMAP);
+            tempReading = analogRead(pinEMAP);
+
+            //Error check
+            if( (tempReading < VALID_MAP_MAX) && (tempReading > VALID_MAP_MIN) )
+            {
+              currentStatus.EMAPADC = ADC_FILTER(tempReading, ADCFILTER_MAP, currentStatus.EMAPADC);
+              EMAPrunningValue += currentStatus.EMAPADC; //Add the current reading onto the total
+            }
+            else { mapErrorCount += 1; }
+          }
         }
         else
         {
@@ -117,12 +130,20 @@ static inline void readMAP()
           {
             currentStatus.mapADC = ldiv(MAPrunningValue, MAPcount).quot;
             currentStatus.MAP = fastMap10Bit(currentStatus.mapADC, configPage2.mapMin, configPage2.mapMax); //Get the current MAP value
-            //currentStatus.MAP = fastMap1023toX(currentStatus.mapADC, configPage2.mapMax);
             if(currentStatus.MAP < 0) { currentStatus.MAP = 0; } //Sanity check
+
+            //If EMAP is enabled, the process is identical to the above
+            if(configPage6.useEMAP == true)
+            {
+              currentStatus.EMAPADC = ldiv(EMAPrunningValue, MAPcount).quot; //Note that the MAP count can be reused here as it will always be the same count.
+              currentStatus.EMAP = fastMap10Bit(currentStatus.EMAPADC, configPage2.EMAPMin, configPage2.EMAPMax);
+              if(currentStatus.EMAP < 0) { currentStatus.EMAP = 0; } //Sanity check
+            }
           }
           else { instanteneousMAPReading(); }
           MAPcurRev = currentStatus.startRevolutions; //Reset the current rev count
           MAPrunningValue = 0;
+          EMAPrunningValue = 0; //Can reset this even if EMAP not used
           MAPcount = 0;
         }
       }
@@ -179,11 +200,28 @@ void readTPS()
     byte tempTPS = fastMap1023toX(analogRead(pinTPS), 255); //Get the current raw TPS ADC value and map it into a byte
   #endif
   currentStatus.tpsADC = ADC_FILTER(tempTPS, ADCFILTER_TPS, currentStatus.tpsADC);
-  //Check that the ADC values fall within the min and max ranges (Should always be the case, but noise can cause these to fluctuate outside the defined range).
   byte tempADC = currentStatus.tpsADC; //The tempADC value is used in order to allow TunerStudio to recover and redo the TPS calibration if this somehow gets corrupted
-  if (currentStatus.tpsADC < configPage2.tpsMin) { tempADC = configPage2.tpsMin; }
-  else if(currentStatus.tpsADC > configPage2.tpsMax) { tempADC = configPage2.tpsMax; }
-  currentStatus.TPS = map(tempADC, configPage2.tpsMin, configPage2.tpsMax, 0, 100); //Take the raw TPS ADC value and convert it into a TPS% based on the calibrated values
+
+  if(configPage2.tpsMax > configPage2.tpsMin)
+  {
+    //Check that the ADC values fall within the min and max ranges (Should always be the case, but noise can cause these to fluctuate outside the defined range).
+    if (currentStatus.tpsADC < configPage2.tpsMin) { tempADC = configPage2.tpsMin; }
+    else if(currentStatus.tpsADC > configPage2.tpsMax) { tempADC = configPage2.tpsMax; }
+    currentStatus.TPS = map(tempADC, configPage2.tpsMin, configPage2.tpsMax, 0, 100); //Take the raw TPS ADC value and convert it into a TPS% based on the calibrated values
+  }
+  else
+  {
+    //This case occurs when the TPS +5v and gnd are wired backwards, but the user wishes to retain this configuration.
+    //In such a case, tpsMin will be greater then tpsMax and hence checks and mapping needs to be reversed
+
+    tempADC = 255 - currentStatus.tpsADC; //Reverse the ADC values
+
+    //All checks below are reversed from the standard case above
+    if (tempADC > configPage2.tpsMin) { tempADC = configPage2.tpsMin; }
+    else if(tempADC < configPage2.tpsMax) { tempADC = configPage2.tpsMax; }
+    currentStatus.TPS = map(tempADC, configPage2.tpsMax, configPage2.tpsMin, 0, 100);
+  }
+
   currentStatus.TPS_time = currentLoopTime;
 }
 
@@ -245,11 +283,20 @@ void readO2()
   currentStatus.O2 = o2CalibrationTable[currentStatus.O2ADC];
 }
 
+void readO2_2()
+{
   //Second O2 currently disabled as its not being used
   //Get the current O2 value.
-  //currentStatus.O2_2ADC = map(analogRead(pinO2_2), 0, 1023, 0, 511);
-  //currentStatus.O2_2ADC = ADC_FILTER(tempReading, ADCFILTER_O2, currentStatus.O2_2ADC);
-  //currentStatus.O2_2 = o2CalibrationTable[currentStatus.O2_2ADC];
+  unsigned int tempReading;
+  #if defined(ANALOG_ISR)
+    tempReading = fastMap1023toX(AnChannel[pinO2_2-A0], 511); //Get the current O2 value.
+  #else
+    tempReading = analogRead(pinO2_2);
+    tempReading = fastMap1023toX(analogRead(pinO2_2), 511); //Get the current O2 value.
+  #endif
+  currentStatus.O2_2ADC = ADC_FILTER(tempReading, ADCFILTER_O2, currentStatus.O2_2ADC);
+  currentStatus.O2_2 = o2CalibrationTable[currentStatus.O2_2ADC];
+}
 
 void readBat()
 {

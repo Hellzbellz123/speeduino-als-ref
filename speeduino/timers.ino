@@ -128,7 +128,7 @@ void oneMSInterval() //Most ARM chips can simply call a function
     BIT_SET(TIMER_mask, BIT_TIMER_4HZ);
     #if defined(CORE_STM32) //debug purpose, only visal for running code
       digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
-    #endif  
+    #endif
 
     #if defined(CORE_AVR)
       //Reset watchdog timer (Not active currently)
@@ -147,7 +147,7 @@ void oneMSInterval() //Most ARM chips can simply call a function
     BIT_SET(TIMER_mask, BIT_TIMER_1HZ);
 
     dwellLimit_uS = (1000 * configPage4.dwellLimit); //Update uS value incase setting has changed
-    currentStatus.crankRPM = ((unsigned int)configPage4.crankRPM * 100);
+    currentStatus.crankRPM = ((unsigned int)configPage4.crankRPM * 10);
 
     //**************************************************************************************************************************************************
     //This updates the runSecs variable
@@ -239,7 +239,7 @@ static inline unsigned long micros_safe()
 {
   unsigned long newMicros;
   noInterrupts();
-  newMicros = micros();
+  newMicros = (((timer5_overflow_count << 16) + TCNT5) * 4);
   interrupts();
 
   return newMicros;
